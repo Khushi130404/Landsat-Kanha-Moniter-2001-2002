@@ -1,67 +1,99 @@
 # ============================================================
-# NDVI SMOOTHING USING SAVITZKY-GOLAY FILTER
+# NDVI SMOOTHING USING SAVITZKY–GOLAY FILTER (ROBUST)
 # ============================================================
 
-library(dplyr)
-library(lubridate)
-library(zoo)
-library(signal)    # for sgolayfilt
-library(ggplot2)
+# -----------------------------
+# Load / install packages
+# -----------------------------
+pkgs <- c("dplyr", "lubridate", "zoo", "signal", "ggplot2")
+for(p in pkgs){
+  if(!requireNamespace(p, quietly=TRUE)) install.packages(p)
+  library(p, character.only = TRUE)
+}
 
-# --- Input / Output folders ---
+# -----------------------------
+# Input / Output folders
+# -----------------------------
 input_dir  <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_interpolated"
 output_dir <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_sg_smoothed"
 plot_dir   <- "D:/Landsat_Kanha_Moniter_2001_2002/image/plot_sg_smoothed"
 
-if (!dir.exists(output_dir)) dir.create(output_dir)
-if (!dir.exists(plot_dir)) dir.create(plot_dir)
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
 
-# --- List CSV files ---
-csv_files <- list.files(input_dir, pattern = "\\.csv$", full.names = TRUE)
-if(length(csv_files)==0) stop("❌ No CSV files found!")
+# -----------------------------
+# List CSV files
+# -----------------------------
+csv_files <- list.files(input_dir, pattern="\\.csv$", full.names=TRUE)
+if(length(csv_files) == 0) stop("❌ No CSV files found")
 
-# --- Loop through each region ---
-for(file in csv_files) {
+# -----------------------------
+# Loop through files
+# -----------------------------
+for(file in csv_files){
   
   cat("Processing:", basename(file), "\n")
   
   ndvi <- read.csv(file, stringsAsFactors = FALSE)
   
-  # --- Parse dates ---
-  ndvi$date <- as.Date(ndvi$date)
+  # ---- Date parsing
+  ndvi$date <- as.Date(ndvi$date, tryFormats = c("%Y-%m-%d", "%d-%m-%Y"))
+  ndvi <- ndvi[order(ndvi$date), ]
   
-  # --- Fill any NA in ndvi_interp with linear approx for SG filter ---
-  ndvi$ndvi_interp <- na.approx(ndvi$ndvi_interp, x=ndvi$date, na.rm=FALSE)
+  # ---- Detect NDVI column automatically
+  ndvi_col <- intersect(c("ndvi_interp", "median_ndvi"), names(ndvi))[1]
+  if(is.na(ndvi_col)){
+    cat("⚠️ No NDVI column found, skipping\n\n")
+    next
+  }
   
-  # --- Apply Savitzky-Golay filter ---
-  # window size must be odd; poly order = 2
-  window_size <- 7
-  if(window_size %% 2 == 0) window_size <- window_size + 1  # ensure odd
+  # ---- Ensure numeric
+  ndvi[[ndvi_col]] <- as.numeric(ndvi[[ndvi_col]])
   
-  ndvi$ndvi_sg <- sgolayfilt(ndvi$ndvi_interp, p = 2, n = window_size)
+  # ---- Fill gaps BEFORE SG
+  ndvi$ndvi_filled <- zoo::na.approx(
+    ndvi[[ndvi_col]],
+    na.rm = FALSE
+  )
   
-  # --- Save smoothed CSV ---
+  # ---- Edge filling (important for SG)
+  ndvi$ndvi_filled <- zoo::na.locf(ndvi$ndvi_filled, na.rm=FALSE)
+  ndvi$ndvi_filled <- zoo::na.locf(ndvi$ndvi_filled, fromLast=TRUE)
+  
+  # ---- Apply Savitzky–Golay filter
+  window_size <- 7   # 7*5 = 35 days (good for Landsat)
+  poly_order  <- 2
+  
+  ndvi$ndvi_sg <- signal::sgolayfilt(
+    ndvi$ndvi_filled,
+    p = poly_order,
+    n = window_size
+  )
+  
+  # ---- Save CSV
   out_csv <- paste0(tools::file_path_sans_ext(basename(file)), "_SG.csv")
   write.csv(ndvi, file.path(output_dir, out_csv), row.names = FALSE)
   cat("✅ Saved CSV:", out_csv, "\n")
   
-  # --- Plot smoothed curve ---
+  # ---- Plot
   p <- ggplot(ndvi, aes(x=date)) +
-    geom_line(aes(y=ndvi_interp), color="grey50", linewidth=0.6) +  # interpolated
-    geom_line(aes(y=ndvi_sg), color="blue", linewidth=1) +          # SG-smoothed
+    geom_point(aes(y=ndvi[[ndvi_col]]), color="red", size=1.4) +
+    geom_line(aes(y=ndvi_filled), color="grey60", linewidth=0.6) +
+    geom_line(aes(y=ndvi_sg), color="blue", linewidth=1.2) +
     scale_x_date(date_breaks="1 month", date_labels="%b (%Y)") +
     labs(
-      title="NDVI SG Smoothed Time Series",
-      subtitle=tools::file_path_sans_ext(basename(file)),
-      x="Date (Apr 2001 → Apr 2002)",
-      y="NDVI"
+      title = "NDVI Savitzky–Golay Smoothed Curve",
+      subtitle = tools::file_path_sans_ext(basename(file)),
+      x = "Time",
+      y = "NDVI"
     ) +
     theme_minimal(base_size=13) +
     theme(axis.text.x = element_text(angle=45, hjust=1))
   
-  out_plot <- paste0(tools::file_path_sans_ext(basename(file)), "_NDVI_SG.png")
-  ggsave(filename=file.path(plot_dir, out_plot), plot=p, width=10, height=5, dpi=300)
+  out_plot <- paste0(tools::file_path_sans_ext(basename(file)), "_SG.png")
+  ggsave(file.path(plot_dir, out_plot), p, width=10, height=5, dpi=300)
+  
   cat("✅ Saved plot:", out_plot, "\n\n")
 }
 
-cat("🎉 All regions processed: SG smoothing + plots generated.\n")
+cat("🎉 SG smoothing completed successfully for all regions.\n")
