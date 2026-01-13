@@ -21,7 +21,7 @@ if (!dir.exists(output_dir)) {
 # -----------------------------
 csv_files <- list.files(
   input_dir,
-  pattern = "_5day_interpolated\\.csv$",
+  pattern = "_5day_interpolated_shape\\.csv$",
   full.names = TRUE
 )
 
