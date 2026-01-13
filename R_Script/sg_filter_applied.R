@@ -9,9 +9,9 @@ library(signal)    # for sgolayfilt
 library(ggplot2)
 
 # --- Input / Output folders ---
-input_dir  <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/processed"
-output_dir <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/sg_smoothed"
-plot_dir   <- file.path(output_dir, "plots")
+input_dir  <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_interpolated"
+output_dir <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_sg_smoothed"
+plot_dir   <- "D:/Landsat_Kanha_Moniter_2001_2002/image/plot_sg_smoothed"
 
 if (!dir.exists(output_dir)) dir.create(output_dir)
 if (!dir.exists(plot_dir)) dir.create(plot_dir)
