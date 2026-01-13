@@ -1,10 +1,11 @@
 # ============================================================
-# NDVI 5-DAY INTERPOLATION (DD-MM-YYYY + NaN HANDLING)
+# SHAPE-PRESERVING NDVI 5-DAY INTERPOLATION (PCHIP)
 # ============================================================
 
 library(dplyr)
 library(zoo)
 library(lubridate)
+library(splines)
 
 # -----------------------------
 # FIXED STUDY PERIOD
@@ -23,16 +24,20 @@ if (!dir.exists(output_dir)) {
 }
 
 # -----------------------------
-# LIST CSV FILES
+# LIST ALL CSV FILES
 # -----------------------------
 csv_files <- list.files(
   input_dir,
-  pattern = "\\.csv$",
+  pattern = "\\.csv$",   # <- match all CSVs
   full.names = TRUE
 )
 
+if(length(csv_files) == 0){
+  stop("❌ No CSV files found in input folder! Check path or pattern.")
+}
+
 # -----------------------------
-# PROCESS EACH FILE
+# PROCESS EACH REGION
 # -----------------------------
 for (file in csv_files) {
   
@@ -68,10 +73,11 @@ for (file in csv_files) {
     all.x = TRUE
   )
   
-  # ---- INTERPOLATE NDVI ONLY
-  ndvi_merge$ndvi_interp <- na.approx(
+  # ---- SHAPE-PRESERVING INTERPOLATION (PCHIP)
+  ndvi_merge$ndvi_interp <- na.spline(
     ndvi_merge$median_ndvi,
     x = ndvi_merge$date,
+    method = "monoH.FC",
     na.rm = FALSE
   )
   
@@ -89,7 +95,7 @@ for (file in csv_files) {
   # ---- SAVE OUTPUT
   out_file <- paste0(
     tools::file_path_sans_ext(basename(file)),
-    "_5day_interpolated.csv"
+    "_5day_interpolated_shape.csv"
   )
   
   write.csv(
@@ -98,7 +104,7 @@ for (file in csv_files) {
     row.names = FALSE
   )
   
-  cat("Saved:", out_file, "\n\n")
+  cat("✅ Saved:", out_file, "\n\n")
 }
 
-cat("✅ 5-day interpolation completed correctly.\n")
+cat("🎉 Shape-preserving 5-day interpolation completed for all regions.\n")
