@@ -22,7 +22,7 @@ library(zoo)
 # 2. Input / Output folders
 # -----------------------------
 input_dir  <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_raw"
-output_dir <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_double_logistic"
+output_dir <- "D:/Landsat_Kanha_Moniter_2001_2002/Data_Table/data_interpolated"
 plot_dir   <- "D:/Landsat_Kanha_Moniter_2001_2002/image/plot_double_logistic"
 
 if(!dir.exists(output_dir)) dir.create(output_dir, recursive=TRUE)
